@@ -99,7 +99,20 @@ class IrcMachine::Plugin::GithubJuici < IrcMachine::Plugin::Base
       # TODO Include some logic for working out if we're done with this route
       # and calling #drop_route!
       payload = ::IrcMachine::Models::JuiciNotification.new(request.body.read, :juici_url => juici_url)
-      notify "#{payload.status} - #{project.name} :: #{commit.branch} :: built in #{time_elapsed.call}s :: JuiCI #{payload.url}"
+      notify "#{payload.status} - #{project.name} :: #{commit.branch} :: built in #{time_elapsed.call}s :: JuiCI #{payload.url} :: PING #{commit.author_usernames.join(" ")}"
+      mark_build(commit, payload.status)
     }
+  end
+
+  def mark_build(commit, status)
+    project = "#{commit.repository.owner["name"]}/#{commit.repo_name}"
+    sha     = commit.after
+    status = case status
+             when "failed"
+               "failure"
+             else
+               status
+             end
+    plugin_send(:GithubCommitStatus, :mark, project, sha, status)
   end
 end

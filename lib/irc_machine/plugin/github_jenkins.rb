@@ -41,6 +41,10 @@ class IrcMachine::Plugin::GithubJenkins < IrcMachine::Plugin::Base
       ::IrcMachine::Models::GithubUser.nicks = settings["usernames"]
     end
 
+    if settings.include? "username_prefix"
+      ::IrcMachine::Models::GithubUser.nicks = settings["username_prefix"]
+    end
+
     route(:post, %r{^/github/jenkins$}, :build_branch)
     route(:post, %r{^/github/jenkins_status$}, :jenkins_status)
     route(:post, %r{^/github/notice$}, :rest_notice)
@@ -151,8 +155,7 @@ class IrcMachine::Plugin::GithubJenkins < IrcMachine::Plugin::Base
     "#{colorise(build.status)} - #{commit.repo_name.irc_bold}/#{commit.branch.irc_bold} built in #{commit.build_time.irc_bold}s :: #{commit.github_url}".tap do |msg|
       msg << " :: Jenkins #{build.full_url}" unless build.status =~ /^SUCC/
       unless commit.tag?
-        users = commit.users_to_notify.map { |nick| "@#{nick}" }
-        msg << " :: PING #{users.join(" ")}"
+        msg << " :: PING #{commit.users_to_notify.join(" ")}"
       end
     end
   end
