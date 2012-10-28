@@ -58,6 +58,10 @@ module IrcMachine
         authors.map{ |a| a.username }.uniq
       end
 
+      def author_nicks
+        authors.map{ |a| a.nick }.uniq
+      end
+
       def compare_url
         data.compare
       end
@@ -79,6 +83,14 @@ module IrcMachine
 
       def ref
         data.ref
+      end
+
+      def pusher
+        # The last commit is probably the person who pushed the branch
+        push_commit = commits.last
+        return nil if push_commit.nil?
+        push_user = ::IrcMachine::Models::GithubUser.new push_commit["author"]
+        push_user.nick
       end
 
     end
