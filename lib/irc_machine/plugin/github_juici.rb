@@ -1,6 +1,7 @@
 require 'json'
 require 'net/http'
 require 'uuid'
+require 'juici/interface'
 
 # TODO potentially merge this with the jenkins plugin?
 #
@@ -89,25 +90,22 @@ class IrcMachine::Plugin::GithubJuici < IrcMachine::Plugin::Base
   end
 
   def status_callback(data={})
-    started = Time.now.to_i
     project = data[:project]
     commit = data[:commit]
     opts = data[:opts]
-
-    time_elapsed = lambda { Time.now.to_i - started }
 
     lambda { |request, match|
       # TODO Include some logic for working out if we're done with this route
       # and calling #drop_route!
       payload = ::IrcMachine::Models::JuiciNotification.new(request.body.read, :juici_url => juici_url)
-      notify "#{payload.status} - #{project.name} :: #{commit.branch} :: built in #{time_elapsed.call}s :: JuiCI #{payload.url} :: PING #{commit.author_nicks.join(" ")}"
+      notify "#{payload.status} - #{project.name} :: #{commit.branch} :: built in #{payload.time}s :: JuiCI #{payload.url} :: PING #{commit.author_nicks.join(" ")}"
       mark_build(commit, payload.status)
 
       notify_callback = lambda { |str| notify str }
       case payload.status
-      when "failed"
+      when Juici::BuildStatus::FAIL
         plugin_send(:JenkinsNotify, :build_fail, commit, nil,  notify_callback)
-      when "success"
+      when Juici::BuildStatus::PASS
         plugin_send(:JenkinsNotify, :build_success, commit, nil, notify_callback)
       end
     }
@@ -117,7 +115,7 @@ class IrcMachine::Plugin::GithubJuici < IrcMachine::Plugin::Base
     project = "#{commit.repository.owner["name"]}/#{commit.repo_name}"
     sha     = commit.after
     status = case status
-             when "failed"
+             when Juici::BuildStatus::FAIL
                "failure"
              else
                status
