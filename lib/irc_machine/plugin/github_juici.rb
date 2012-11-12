@@ -42,7 +42,9 @@ class IrcMachine::Plugin::GithubJuici < IrcMachine::Plugin::Base
 
   def build_branch(request, match)
     commit = ::IrcMachine::Models::GithubNotification.new(request.body.read)
-    if project = get_project(commit.project)
+    if commit.after == "0"*40
+      notify "Not building deleted branch #{commit.branch} of #{commit.project}"
+    elsif project = get_project(commit.project)
       start_build(project, commit, :environment => {"SHA1" => commit.after, "ref" => commit.ref})
     end
   end
@@ -59,7 +61,7 @@ class IrcMachine::Plugin::GithubJuici < IrcMachine::Plugin::Base
       status_callback(:project => project, :commit => commit, :opts => opts))
 
     http.start do |h|
-      post("/builds/new", project.build_payload(:environment => opts[:environment], :callbacks => [callback[:url]], :title => title, :priority => priority))
+      h.post("/builds/new", project.build_payload(:environment => opts[:environment], :callbacks => [callback[:url]], :title => title, :priority => priority))
     end
   end
 
@@ -100,7 +102,7 @@ class IrcMachine::Plugin::GithubJuici < IrcMachine::Plugin::Base
       # and calling #drop_route!
       payload = ::IrcMachine::Models::JuiciNotification.new(request.body.read, :juici_url => juici_url)
       notify "#{payload.status} - #{project.name} :: #{commit.branch} :: built in #{payload.time}s :: JuiCI #{payload.url} :: PING #{commit.author_nicks.join(" ")}"
-      mark_build(commit, payload.status)
+      mark_build(commit, payload.status, payload.url)
 
       notify_callback = lambda { |str| notify str }
       case payload.status
@@ -112,7 +114,7 @@ class IrcMachine::Plugin::GithubJuici < IrcMachine::Plugin::Base
     }
   end
 
-  def mark_build(commit, status)
+  def mark_build(commit, status, url=nil)
     project = "#{commit.repository.owner["name"]}/#{commit.repo_name}"
     sha     = commit.after
     status = case status
@@ -121,6 +123,6 @@ class IrcMachine::Plugin::GithubJuici < IrcMachine::Plugin::Base
              else
                status
              end
-    plugin_send(:GithubCommitStatus, :mark, project, sha, status)
+    plugin_send(:GithubCommitStatus, :mark, project, sha, status, target_url: url)
   end
 end
