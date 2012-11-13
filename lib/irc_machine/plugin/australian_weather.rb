@@ -1,3 +1,4 @@
+require 'irc_machine'
 require 'rest_client'
 require 'nokogiri'
 
@@ -13,7 +14,7 @@ class IrcMachine::Plugin::AustralianWeather < IrcMachine::Plugin::Base
 
   def receive_line(line)
     if line =~ /^:\S+ PRIVMSG (#+\S+) :#{session.state.nick}:? how is the weather\??$/
-      session.msg $1, weather_report
+      weather_report.each {|message| session.msg $1, message }
     end
   end
 
@@ -22,14 +23,15 @@ class IrcMachine::Plugin::AustralianWeather < IrcMachine::Plugin::Base
     forecasts = bom_page.css('.forecast')
     today = forecasts[0]
     tomorrow = forecasts[1]
-    max_today = today.at_css('.max').text
-    max_tomorrow = tomorrow.at_css('.max').text
-    summary_today = today.at_css('.summary').text
-    summary_tomorrow = tomorrow.at_css('.summary').text
-    <<-FORECAST
-Today: #{max_today}, #{summary_today}
-Tomorrow: #{max_tomorrow}, #{summary_tomorrow}
-    FORECAST
+
+    max_today = today.at_css('.max').text rescue "No temp. specified"
+    max_tomorrow = tomorrow.at_css('.max').text rescue "No summary"
+    summary_today = today.at_css('.summary').text rescue "No temp. specified"
+    summary_tomorrow = tomorrow.at_css('.summary').text rescue "No summary"
+    [
+      "Today: #{max_today}, #{summary_today}",
+      "Tomorrow: #{max_tomorrow}, #{summary_tomorrow}"
+    ]
   end
 
 end

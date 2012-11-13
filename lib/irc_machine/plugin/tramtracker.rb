@@ -1,3 +1,4 @@
+require 'irc_machine'
 require 'rest_client'
 require 'nokogiri'
 
@@ -14,11 +15,11 @@ require 'nokogiri'
 #
 
 class IrcMachine::Plugin::TramTracker < IrcMachine::Plugin::Base
-  CONFIG_FILE = "tramtracker.json"
+  CONFIG_FILE = "trams.json"
 
   def receive_line(line)
     if line =~ /^:\S+ PRIVMSG (#+\S+) :#{session.state.nick}:? when is the next tram\??$/
-      session.msg $1, departure_times
+      departure_times.each { |message| session.msg $1, message }
     end
   end
 
@@ -27,11 +28,12 @@ class IrcMachine::Plugin::TramTracker < IrcMachine::Plugin::Base
     settings["stops"].each do |description, id|
       url = settings["url_pattern"].gsub(/STOP_ID/, id)
       # This is basically the worst HTML ever, so the scraping is a little primitive.
-      tracker_page = Nokogiri::HTML(RestClient.get(url)).text.lines.to_a
+      tracker_page = Nokogiri::HTML(RestClient.get(url)).text.lines.to_a.map &:strip
 
-      id_line = "ID: #{id}\n"
+      id_line = "ID: #{id}"
       if not tracker_page.index(id_line)
-        id << "Error parsing tramtracker page for #{description}"
+        info << "Error parsing tramtracker page for #{description}"
+        info << "Could not find #{id_line.inspect} in:\n #{tracker_page.join("\n")}"
       else
         start = tracker_page.index(id_line) + 1
         finish = start + 5
@@ -42,7 +44,7 @@ class IrcMachine::Plugin::TramTracker < IrcMachine::Plugin::Base
         end
       end
     end
-    info.join("\n")
+    info
   end
 
 
